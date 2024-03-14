@@ -1,4 +1,5 @@
 const URL = 'https://data.stad.gent/api/explore/v2.1/catalog/datasets/sheep-tracking-gent/records?limit=20';
+const ZOOM_LEVEL = 12;
 
 const getSheep = async () => {
   const response = await fetch(URL);
@@ -8,10 +9,12 @@ const getSheep = async () => {
 }
 
 const calculateIconSizeBasedOnZoom = (zoomLevel) => {
-  const baseSize = 120; // Starting size to match initial icon size
-  const size = baseSize * (1 + (zoomLevel - 13) * 0.3); // Example scaling, adjust as needed
+  const baseSize = 200;
+  let size = baseSize * (1 + (zoomLevel - 12) * 0.3);
+  size = Math.max(50, Math.min(size, 400));  // Cap size between 50 and 400 for example
   return [size, size];
 }
+
 
 const handleZoomEnd = (map, marker, icon) => {
   const currentZoom = map.getZoom();
@@ -19,7 +22,7 @@ const handleZoomEnd = (map, marker, icon) => {
   const newIcon = L.icon({
     iconUrl: icon.options.iconUrl,
     iconSize: newIconSize,
-    iconAnchor: [newIconSize[0] / 2, newIconSize[1] / 2], // Adjusted anchor positioning
+    iconAnchor: [newIconSize[0] / 2, newIconSize[1] / 2],
   });
 
   marker.setIcon(newIcon);
@@ -28,31 +31,34 @@ const handleZoomEnd = (map, marker, icon) => {
 
 const init = async () => {
   try {
-    const { location } = await getSheep(); // Assuming getSheep() is correctly defined elsewhere
-    const map = L.map('map').setView([location.lat, location.lon], 13);
+    const { location } = await getSheep();
+    const map = L.map('map').setView([location.lat, location.lon], ZOOM_LEVEL);
+    map.on('zoomend', () => handleZoomEnd(map, marker, icon));
 
-    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 })
 
     tileLayer.addTo(map);
+    tileLayer.getContainer().style.filter = "grayscale(90%)";
 
-    tileLayer.getContainer().style.filter = "grayscale(80%)";
-
-    // TODO: Change marker on desktop 
+    // Change marker on desktop 
     const icon = L.icon({
       iconUrl: 'assets/sheep.gif',
-      iconSize: [200, 200], // Ensure this aligns with your scaling strategy
-      iconAnchor: [50, 50],
+      iconSize: [100, 100],
+      iconAnchor: [100, 100],
     });
 
     const marker = L.marker([location.lat, location.lon], { icon }).addTo(map);
 
-    map.on('zoomend', () => handleZoomEnd(map, marker, icon));
-
+    // Locate & show current location
+    map.locate();
+    map.on('locationfound', (e) => {
+      L.marker(e.latlng).addTo(map);
+      map.setView(e.latlng, ZOOM_LEVEL);
+    });
 
   } catch (error) {
     console.error('Failed to initialize the map:', error);
   }
 };
-
 
 init();
